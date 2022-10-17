@@ -6,8 +6,6 @@ clc
 
 %TODO: check if every tf is correcty written 
 %TODO: apply step inputs with the scaled version and compare with paper
-%TODO: adding disturbance to the system
-%TODO: finding and applying SI method
 
 %four inputs: 
 %feed rate
@@ -43,15 +41,15 @@ Pspm=[p11 p12 p13 p14;
       p21 p22 p23 p24;
       p31 p32 p33 p34;
       p41 p42 p43 p44];
-
-T = 0:1:500;
+Ts = 1;
+T = (0:Ts:500)';
 figure
 bode(Pspm);
 
 figure
 impulse(Pspm)
 figure
-step(Pspm, T)
+step_resp = step(Pspm, T)
 
 
 sys_ss = ss(Pspm);
@@ -59,4 +57,34 @@ A = sys_ss.A;
 B = sys_ss.B;
 C = sys_ss.C;
 D = sys_ss.D;
+
+%%
+close all
+d = (dr-0.5)*0.1+1;
+step_u = ones(length(T),1) ;
+zeros_u = zeros(length(T),1);
+
+y = iddata([step_u,step_u,step_u,step_u],...
+           [step_resp(:,1,1,:),step_resp(:,1,2,:),step_resp(:,1,3,:),step_resp(:,1,4,:)],Ts);
+y.InputName  = {'step_u';'zeros_u';"zeros_u_1";"zeros_u_2"};
+y.OutputName = {'Var5';'Var6';'Var7'; 'Var8'};
+dr = rand(1,length(T));
+d = ((dr-0.5)*0.1+1)';
+step_u = ones(length(T),1) ;
+zeros_u = zeros(length(T),1);
+y_m = iddata([step_u,d.*step_u,step_u,step_u.*d],...
+           [step_resp(:,1,1,:).*d,step_resp(:,1,2,:).*d,step_resp(:,1,3,:).*d,step_resp(:,1,4,:).*d],Ts);
+y_m.InputName  = {'step_u';'zeros_u';"zeros_u_1";"zeros_u_2"};
+y_m.OutputName = {'Var5';'Var6';'Var7'; 'Var8'};
+
+
+nx = 3;
+sysc = ssest(y,nx , ... 
+    'InputName',["step_u" "zeros_u" "zeros_u_1" "zeros_u_2"],...
+    'OutputName',["Var5" "Var6" "Var7" "Var8"]);
+
+compare(y_m,y,sysc)
+
+
+
 
