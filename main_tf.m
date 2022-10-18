@@ -85,6 +85,12 @@ sysc = ssest(y,nx , ...
 
 compare(y_m,y,sysc)
 
+%%
+close all
+p44=tf([-0.031],[1 0]);
+[sys_si, sys_m] = si_task(p44,3,3);
+compare(sys_m,sys_si);
+
 
 
 
