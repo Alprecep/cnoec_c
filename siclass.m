@@ -17,10 +17,10 @@ classdef siclass < handle
             T = (0:obj.Ts:obj.Tsim)';
 
             % disturbances creation
-            dbar = 0.01;
+            dbar = 0;
             dr = rand(1,length(T));
             d = (dr*dbar)';
-            zvals = obj.u_gen(T);
+            zvals = obj.u_gen(T);  % input signals
 
             d_train_u = d(randperm(length(d)));
             d_train_o = zeros(length(T),1);  % d(randperm(length(d)));
@@ -93,12 +93,14 @@ classdef siclass < handle
         function r = u_gen(obj, T)
             s = length(T);
             r = ones(1,s);
-            r(1,1:200) =  ones(1,200) + 0.1*square(1:200, 50);
-            r(1,201:500) =  ones(1,300) + 0.1*(sin((1:1:300)/20));
-            
-            r = ones(1,length(T)) + 0.1*sin(logspace(0 , 1, length(T))*5);
+            p1 = round(s/3);
+            p2 = 2*p1;
+            r(1,1:p1) =  ones(1,p1) + 0.2*square(1:p1, 50);
+            r(1,p1+1:p2) =  ones(1,p1) + 0.2*(sin((1:1:p1)/p1*500));
+            %r = r*10;
+            %r = ones(1,length(T)) + 0.1*sin(logspace(0 , 1, length(T))*5);
              
-            r = ones(1,s);
+            %r = ones(1,s);
             % sys identification problem
             %zvals = ones(1,length(T)); % input
             %halfsine = sin(pi*[1:1:10]/10);
@@ -121,8 +123,8 @@ classdef siclass < handle
             error_list = [];
             for j=1:4
                 for i=j:4
-                    [a b c d e ] = obj.si_opt(sys,i,j);
-                    error_list(end+1,:) = [d, e, i, j, i+j];
+                    [sys_real, system_id, error_t, error_v] = obj.simopt(sys,i,j);
+                    error_list(end+1,:) = [error_t, error_v, i, j, i+j];
 
                 end
             end
@@ -132,17 +134,104 @@ classdef siclass < handle
             obj.error_table = sortrows(obj.error_table,'compl');
 
             index_min = (find(obj.error_table.error_v == min(obj.error_table.error_v)));
-            index = find( obj.error_table.error_v < obj.error_table.error_v(index_min)*1.2, 1 );
+            %index = find( obj.error_table.error_v < obj.error_table.error_v(index_min)*1.5, 1 );
 
-            obj.na = table2array(obj.error_table(index,3));
-            obj.nb = table2array(obj.error_table(index,4));
+            obj.na = table2array(obj.error_table(index_min,3));
+            obj.nb = table2array(obj.error_table(index_min,4));
 
             obj.na,obj.nb;
-            [system_id, sys_real, theta, error_t, error_v]=obj.si_opt(sys,obj.na,obj.nb);
+            [sys_real, system_id, error_t, error_v]=obj.simopt(sys,obj.na,obj.nb);
             obj.sys_id = system_id;
 
         end
 
+        function [sys, sys_id, error_t,error_v] = simopt(obj,sys,na, nb)
+            % timesteps
+            T = (0:obj.Ts:obj.Tsim)';
+            % disturbances creation
+            dbar = 0;
+            dr = rand(1,length(T));
+            d = (dr*dbar)';
+            zvals = obj.u_gen(T);  % input signals
+
+            d_train_u = d(randperm(length(d)));
+            d_train_o = zeros(length(T),1);  % d(randperm(length(d)));
+            d_val_u =   d(randperm(length(d)));
+            d_val_o =  zeros(length(T),1);  % d(randperm(length(d)));
+
+            % generating data for training
+            ymeas = lsim(sys,(zvals+d_train_u'), T) + d_train_o;
+
+            % order of the model
+            na_model = na;
+            nb_model = nb;
+
+            % generating initial guess for the regressors
+            x0 = zeros(na+nb,1);
+            %% BFGS
+            % Initialize solver options
+            myoptions               =   myoptimset;
+            myoptions.Hessmethod  	=	'BFGS';
+            myoptions.gradmethod  	=	'CD';
+            myoptions.graddx        =	2^-17;
+            myoptions.tolgrad    	=	1e-9;
+            myoptions.ls_tkmax      =	1;          
+            myoptions.ls_beta       =	0.5;
+            myoptions.ls_c          =	1e-4;
+            myoptions.ls_nitermax   =	100;
+            [xopt] = fminunc(@(x) obj.costfcn(na, nb,ymeas, zvals, x, T), x0,myoptions);
+
+            [J, ysim] = obj.costfcn(na, nb, ymeas, zvals, xopt, T);
+           
+
+            % this part is important be aware how to put the parameters of
+            % the model. they need to match with regressor phi. and "1" is
+            % put since it is a discrete time model -->
+            % just write simple time series difference equation convert to
+            % z domain tf and you will see the "1"
+            
+            theta = xopt;
+            
+            sys_id =tf(([theta(na_model+1:end)])', [1,-1*(theta(1:na_model))'], obj.Ts)
+            sys_real = c2d(sys,obj.Ts)
+            
+            sys_id= d2c(sys_id);
+            sys;
+
+            %input for validation set
+            u_validation =ones(1,length(T)) + 0.1*sin(logspace(0 , 1, length(T))*5);
+           
+
+            %validation data generated for real system
+            ymeas_v = lsim(sys,(u_validation + d_val_u'), T)  ;
+            ymeas_v = ymeas_v(max(na_model,nb_model)+1:end);
+
+            %validation for identified data
+            yid_v = lsim(sys_id,(u_validation + d_val_u'), T)  ;
+            yid_v = yid_v(max(na_model,nb_model)+1:end) ;
+
+            % check the results
+            error_t = J;
+
+            res_v = [ymeas_v yid_v];
+            error_v = sum(abs(res_v(:,1)-res_v(:,2)));
+
+        end
+
+        function [J, ysim] = costfcn(obj, na, nb, ymeas, zvals, x, T)
+           
+            %%%% SIMULATION %%%%%%%%
+            ysim = zeros(size(ymeas));
+            J = 0;
+            ysim(1:max(na,nb)) = ymeas(1:max(na,nb));
+
+            for ii = max(na,nb)+1:1:size(T,1)
+                ysim(ii) = [ysim(ii-1:-1:ii-na,1)' zvals(ii-1:-1:ii-nb)] * x;
+                % compute the cost 
+                J = J + abs((ymeas(ii)-ysim(ii)));
+            end
+            J = J;
+        end
 
     end
 end
