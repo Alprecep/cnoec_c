@@ -24,24 +24,19 @@ sys_real_c=[p11 p12 p13 p14;
       p31 p32 p33 p34;
       p41 p42 p43 p44];
 
-p=tf([1], [1  1 1],0.1);
+p=tf([1], [1  1]);
 
 si = siclass();
-%si.si_run(p)
-sys_id_d(:,1) =p ;
-ind = 1;
-for i=1:4
-    for j=1:4
-    [sys_id_d(i,j)]= si.si_run(sys_real_c(i,j));
-    i,j
-    end
-end
-
-
-sys_id_c = d2c(sys_id_d);
-sys_real_d = c2d(sys_real_c,0.1);
-
-
+ 
+ for i=1:4
+     for j=1:4
+     [sys_id_c(i,j)]= si.si_run(sys_real_c(i,j));
+     end
+ end
+%%
+ 
+sys_id_d = c2d(sys_id_c,si.Ts);
+sys_real_d = c2d(sys_real_c,si.Ts);
 bode(sys_id_c, sys_real_c)
 
 
