@@ -8,16 +8,16 @@ clc
 %TODO: apply step inputs with the scaled version and compare with paper
 
 %four inputs: 
-%feed rate
-%mill feed water flow rate
-%sump dilution water flow rate
-%pump speed
+%feed rate 5t/h
+%mill feed water flow rate 2
+%sump dilution water flow rate 6
+%pump speed  -5
 
 %four controled variables are selected:
-%product particle size
-%mill solids concentration
-%sump level
-%circulating load
+%product particle size  70
+%mill solids concentration 80
+%circulating load 140
+%sump level  0.78
 
 %%
 p11=tf([-0.58],[83 1],'InputDelay',41);
@@ -85,12 +85,11 @@ sysc = ssest(y,nx , ...
 
 compare(y_m,y,sysc)
 
+
 %%
 close all
 p44=tf([-0.031],[1 0]);
 [sys_si, sys_m] = si_task(p44,3,3);
 compare(sys_m,sys_si);
-
-
 
 

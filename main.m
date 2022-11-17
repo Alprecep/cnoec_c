@@ -25,29 +25,28 @@ sys_real_c=[p11 p12 p13 p14;
       p41 p42 p43 p44];
 
 p=tf([1], [1  1]);
+si = siclass();
+
+for i=1:4
+    for j=1:4
+       [sys_id_d(i,j)]= si.si_run(sys_real_c(i,j));
+    end
+end
+
+%%
+%sys_id_d = c2d(sys_id_c,si.Ts);
+sys_real_d = c2d(sys_real_c,si.Ts);
+bode( sys_real_d, sys_id_d)
+
+save("tfs", "sys_id_d")
+load("tfs")
+
+%% short test
+p = tf([1e-5], [1  1]);
+p = p23;
 
 si = siclass();
- 
- for i=1:4
-     for j=1:4
-     [sys_id_c(i,j)]= si.si_run(sys_real_c(i,j));
-     end
- end
-%%
- 
-sys_id_d = c2d(sys_id_c,si.Ts);
-sys_real_d = c2d(sys_real_c,si.Ts);
-bode(sys_id_c, sys_real_c)
+id = si.si_run(p);
+real = c2d(p,si.Ts);
 
-
-
-
-
-
-
-
-
-
-
-
-
+bode(real, id)
