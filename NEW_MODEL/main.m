@@ -2,6 +2,7 @@ clear all
 clc
 close all
 %%
+%file:///C:/Users/alpre/OneDrive/Desktop/Polimi/Year5/CNOEC/cnoec_c/1-s2.0-S0959152414002704-main.pdf
 % Mill and feeder parameters
 alfa_f = 0.055;
 alfa_r = 0.465;
